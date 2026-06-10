@@ -32,7 +32,7 @@ RUN tar --strip-components=1 -xvf cppcheck.tar.gz -C /tmp/cppcheck
 RUN rm cppcheck.tar.gz
 RUN cd /tmp/cppcheck
 RUN cmake -S /tmp/cppcheck -B /tmp/cppcheck/build -DCMAKE_INSTALL_PREFIX=/opt/cppcheck
-RUN cmake --build /tmp/cppcheck/build
+RUN cmake --build /tmp/cppcheck/build --parallel $(nproc)
 RUN cmake --install /tmp/cppcheck/build
 
 #Install Clang tools
@@ -70,6 +70,7 @@ RUN apt-get update \
         doxygen \
         git \
         file \
+        xz-utils \
         ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
