@@ -17,10 +17,10 @@ documentation generation — primarily targeting embedded C/C++ projects.
  
 | Tool                                                                              | Version               | Purpose                                      |
 |-----------------------------------------------------------------------------------|-----------------------|----------------------------------------------|
-| [CppCheck](https://cppcheck.sourceforge.io/)                                      | 2.20.0                | Static analysis (built from source)          |
-| [Clang-Format](https://clang.llvm.org/docs/ClangFormat.html)                      | 22.1.0                | Code formatting                              |
-| [Clang-Tidy](https://clang.llvm.org/extra/clang-tidy/)                            | 22.1.0                | Linting and static analysis                  |
-| [run-clang-tidy](https://clang.llvm.org/extra/clang-tidy/#using-clang-tidy)       | 22.1.0                | Parallel Clang-Tidy runner                   |
+| [CppCheck](https://cppcheck.sourceforge.io/)                                      | 2.21.0                | Static analysis (built from source)          |
+| [Clang-Format](https://clang.llvm.org/docs/ClangFormat.html)                      | 22.1.8                | Code formatting                              |
+| [Clang-Tidy](https://clang.llvm.org/extra/clang-tidy/)                            | 22.1.8                | Linting and static analysis                  |
+| [run-clang-tidy](https://clang.llvm.org/extra/clang-tidy/#using-clang-tidy)       | 22.1.8                | Parallel Clang-Tidy runner                   |
 | [Lizard](https://github.com/terryyin/lizard)                                      | 1.23.0                | Cyclomatic complexity measurement            |
 | [REUSE](https://reuse.software/)                                                  | 6.2.0                 | SPDX license compliance checker              |
 | [Doxygen](https://www.doxygen.nl/)                                                | latest at build time  | Documentation generation (via apt)           |
