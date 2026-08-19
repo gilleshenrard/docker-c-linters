@@ -125,6 +125,25 @@ docker build \
 > uses the major version only.
  
 ---
+
+## Vulnerability Scanning
+
+Vulnerabilities can be checked using [Docker Scout](https://docs.docker.com/scout/).
+
+> **Note:** Scout caches SBOMs locally, keyed by image digest. When re-scanning a
+> freshly rebuilt image under the same tag, clear the cache first to avoid stale
+> results.
+
+```bash
+# Clear Scout's local SBOM cache (non-interactive)
+docker scout cache prune --sboms --force
+
+
+# Generate a CVE report in Markdown format
+docker scout cves <image_name>:<image_revision> --format markdown --output <image_name>_report.md
+```
+
+---
  
 ## Image Architecture
  

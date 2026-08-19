@@ -23,7 +23,17 @@ ARG LIZARDVERSION
 ARG REUSEVERSION
 
 #Install prerequisites
-RUN apt-get update && apt-get install -y wget build-essential cmake ninja-build python3 python3-pip python3-venv
+RUN    apt-get update \
+    && apt-get upgrade -y \
+    && apt-get dist-upgrade -y \
+    && apt-get autoremove -y \
+    && apt-get install -y \
+        wget \
+        build-essential \
+        cmake \
+        ninja-build \
+        python3 \
+        python3-venv
 
 #Install CppCheck
 RUN wget -O cppcheck.tar.gz "https://github.com/cppcheck-opensource/cppcheck/archive/refs/tags/${CPPCHECKVERSION}.tar.gz"
@@ -53,8 +63,12 @@ RUN rm llvm_clang.tar.gz
 
 #Install lizard and REUSE
 RUN python3 -m venv /opt/pip-packages
-RUN /opt/pip-packages/bin/pip install lizard==${LIZARDVERSION} reuse==${REUSEVERSION}
-RUN rm -rf /opt/pip-packages/bin/pip*
+RUN wget -O get-pip.py "https://bootstrap.pypa.io/get-pip.py" \
+    && /opt/pip-packages/bin/python3 get-pip.py \
+    && rm get-pip.py
+RUN /opt/pip-packages/bin/pip install lizard==${LIZARDVERSION} reuse==${REUSEVERSION} \
+    && /opt/pip-packages/bin/pip install --upgrade "setuptools>=78.1.1" "msgpack>=1.2.1"
+RUN rm -rf /opt/pip-packages/bin/pip* /opt/pip-packages/lib/python3.13/site-packages/pip
 
 
 ##################################################################################################################################
@@ -64,6 +78,9 @@ FROM debian:trixie-slim AS run
 
 #Install prerequisites
 RUN apt-get update \
+    && apt-get upgrade -y \
+    && apt-get dist-upgrade -y \
+    && apt-get autoremove -y \
     && apt-get install \
         -y --no-install-recommends \
         python3 \
