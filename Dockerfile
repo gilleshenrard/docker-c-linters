@@ -22,8 +22,8 @@ ARG CLANGVERSION
 ARG LIZARDVERSION
 ARG REUSEVERSION
 
-#Install prerequisites
-RUN    apt-get update \
+#Install prerequisites and update base OS packages
+RUN apt-get update \
     && apt-get upgrade -y \
     && apt-get dist-upgrade -y \
     && apt-get autoremove -y \
@@ -35,40 +35,45 @@ RUN    apt-get update \
         python3 \
         python3-venv
 
-#Install CppCheck
-RUN wget -O cppcheck.tar.gz "https://github.com/cppcheck-opensource/cppcheck/archive/refs/tags/${CPPCHECKVERSION}.tar.gz"
-RUN mkdir -p /opt/cppcheck /tmp/cppcheck
-RUN tar --strip-components=1 -xvf cppcheck.tar.gz -C /tmp/cppcheck
-RUN rm cppcheck.tar.gz
-RUN cd /tmp/cppcheck
-RUN cmake -S /tmp/cppcheck -B /tmp/cppcheck/build -DCMAKE_INSTALL_PREFIX=/opt/cppcheck
-RUN cmake --build /tmp/cppcheck/build --parallel $(nproc)
-RUN cmake --install /tmp/cppcheck/build
+#Install CppCheck from its Github repo
+RUN wget -O cppcheck.tar.gz "https://github.com/cppcheck-opensource/cppcheck/archive/refs/tags/${CPPCHECKVERSION}.tar.gz" \
+    && mkdir -p /opt/cppcheck /tmp/cppcheck \
+    && tar --strip-components=1 -xvf cppcheck.tar.gz -C /tmp/cppcheck \
+    && rm cppcheck.tar.gz \
+    && cmake -S /tmp/cppcheck -B /tmp/cppcheck/build -DCMAKE_INSTALL_PREFIX=/opt/cppcheck \
+    && cmake --build /tmp/cppcheck/build --parallel $(nproc) \
+    && cmake --install /tmp/cppcheck/build
 
-#Install Clang tools
-RUN wget -O llvm_clang.tar.gz "https://github.com/llvm/llvm-project/releases/download/llvmorg-${CLANGVERSION}/LLVM-${CLANGVERSION}-Linux-X64.tar.xz"
-RUN mkdir -p /opt/clang/bin
-RUN mkdir -p /opt/clang/lib/clang/${CLANGVERSIONMAJOR}/include/
-RUN tar -xvf llvm_clang.tar.gz \
+#Install Clang tools from their Github repo
+RUN wget -O llvm_clang.tar.gz "https://github.com/llvm/llvm-project/releases/download/llvmorg-${CLANGVERSION}/LLVM-${CLANGVERSION}-Linux-X64.tar.xz" \
+    && mkdir -p /opt/clang/bin \
+    && mkdir -p /opt/clang/lib/clang/${CLANGVERSIONMAJOR}/include/ \
+    && tar -xvf llvm_clang.tar.gz \
         --strip-components=2 \
         -C /opt/clang/bin \
         LLVM-${CLANGVERSION}-Linux-X64/bin/clang-format \
         LLVM-${CLANGVERSION}-Linux-X64/bin/clang-tidy \
-        LLVM-${CLANGVERSION}-Linux-X64/bin/run-clang-tidy
-RUN tar -xvf llvm_clang.tar.gz \
+        LLVM-${CLANGVERSION}-Linux-X64/bin/run-clang-tidy \
+    && tar -xvf llvm_clang.tar.gz \
         --strip-components=4 \
         -C /opt/clang/lib/clang/${CLANGVERSIONMAJOR}/ \
-        LLVM-${CLANGVERSION}-Linux-X64/lib/clang/${CLANGVERSIONMAJOR}/include/
-RUN rm llvm_clang.tar.gz
+        LLVM-${CLANGVERSION}-Linux-X64/lib/clang/${CLANGVERSIONMAJOR}/include/ \
+    && rm llvm_clang.tar.gz
 
-#Install lizard and REUSE
+#Create a Python 3 venv
 RUN python3 -m venv /opt/pip-packages
+
+#Install pip (official script is used to install latest version and fix vulnerabilities)
 RUN wget -O get-pip.py "https://bootstrap.pypa.io/get-pip.py" \
     && /opt/pip-packages/bin/python3 get-pip.py \
     && rm get-pip.py
+
+#Install lizard and REUSE, and upgrade dependencies to fix vulnerabilities
 RUN /opt/pip-packages/bin/pip install lizard==${LIZARDVERSION} reuse==${REUSEVERSION} \
     && /opt/pip-packages/bin/pip install --upgrade "setuptools>=78.1.1" "msgpack>=1.2.1"
-RUN rm -rf /opt/pip-packages/bin/pip* /opt/pip-packages/lib/python3.13/site-packages/pip
+
+#Cleanup pip's directories in the venv (install is leaner and fixes vulnerabilities)
+RUN rm -rf /opt/pip-packages/bin/pip* /opt/pip-packages/lib/python*/site-packages/pip
 
 
 ##################################################################################################################################
@@ -76,7 +81,7 @@ RUN rm -rf /opt/pip-packages/bin/pip* /opt/pip-packages/lib/python3.13/site-pack
 ##################################################################################################################################
 FROM debian:trixie-slim AS run
 
-#Install prerequisites
+#Install prerequisites and Doxygen
 RUN apt-get update \
     && apt-get upgrade -y \
     && apt-get dist-upgrade -y \
@@ -91,6 +96,6 @@ RUN apt-get update \
         ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-#Copy Python tools and make them globally available
+#Copy previously installed tools and make them globally available
 COPY --from=build /opt /opt
 ENV PATH="$PATH:/opt/cppcheck/bin/:/opt/clang/bin/:/opt/pip-packages/bin"
