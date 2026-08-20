@@ -17,13 +17,13 @@ documentation generation — primarily targeting embedded C/C++ projects.
  
 | Tool                                                                              | Version               | Purpose                                      |
 |-----------------------------------------------------------------------------------|-----------------------|----------------------------------------------|
-| [CppCheck](https://cppcheck.sourceforge.io/)                                      | 2.21.0                | Static analysis (built from source)          |
+| [CppCheck](https://cppcheck.sourceforge.io/)                                      | 2.21.0                | Static analysis                              |
 | [Clang-Format](https://clang.llvm.org/docs/ClangFormat.html)                      | 22.1.8                | Code formatting                              |
 | [Clang-Tidy](https://clang.llvm.org/extra/clang-tidy/)                            | 22.1.8                | Linting and static analysis                  |
 | [run-clang-tidy](https://clang.llvm.org/extra/clang-tidy/#using-clang-tidy)       | 22.1.8                | Parallel Clang-Tidy runner                   |
 | [Lizard](https://github.com/terryyin/lizard)                                      | 1.23.0                | Cyclomatic complexity measurement            |
 | [REUSE](https://reuse.software/)                                                  | 6.2.0                 | SPDX license compliance checker              |
-| [Doxygen](https://www.doxygen.nl/)                                                | latest at build time  | Documentation generation (via apt)           |
+| [Doxygen](https://www.doxygen.nl/)                                                | 1.18.0                | Documentation generation                     |
  
 ---
  
@@ -116,6 +116,7 @@ docker build \
   --build-arg CLANGVERSIONMAJOR="22" \
   --build-arg LIZARDVERSION="1.23.1" \
   --build-arg REUSEVERSION="6.3.0" \
+  --build-arg DOXYGENVERSION="1.18.0" \
   -t <image_name>:<image_revision> .
 ```
  
@@ -138,7 +139,6 @@ Vulnerabilities can be checked using [Docker Scout](https://docs.docker.com/scou
 # Clear Scout's local SBOM cache (non-interactive)
 docker scout cache prune --sboms --force
 
-
 # Generate a CVE report in Markdown format
 docker scout cves <image_name>:<image_revision> --format markdown --output <image_name>_report.md
 ```
@@ -155,14 +155,15 @@ The image uses a **two-stage build** to keep the final image lean:
 |                                               |
 |  - Compile CppCheck from source               |
 |  - Extract Clang binaries from LLVM release   |
+|  - Install Doxygen from its Github repo       |
 |  - Install Lizard + REUSE in Python venv      |
 +------------------------|----------------------+
                          | COPY /opt
 +------------------------|----------------------+
 | Stage 2 : run (debian:trixie-slim)            |
 |                                               |
-|  - Install python3, doxygen, git,             |
-|    file, ca-certificates                      |
+|  - Install python3, git, file, graphviz,      |
+|    ca-certificates                            |
 |  - Append tool paths to PATH                  |
 +-----------------------------------------------+
 ```
@@ -179,6 +180,7 @@ No build toolchain (cmake, ninja, wget, gcc…) is present in the final image.
 | `/opt/clang/bin/`           | `clang-format`, `clang-tidy`, `run-clang-tidy` |
 | `/opt/clang/lib/clang/22/`  | Clang built-in headers                         |
 | `/opt/pip-packages/bin/`    | `lizard`, `reuse`                              |
+| `/opt/doxygen/bin/`         | `doxygen`                                      |
  
 All of the above are appended to `PATH`, so every tool is callable directly by name.
  

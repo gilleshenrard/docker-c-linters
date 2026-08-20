@@ -7,6 +7,8 @@ ARG CLANGVERSIONMAJOR="22"
 ARG CLANGVERSION="22.1.8"
 ARG LIZARDVERSION="1.23.0"
 ARG REUSEVERSION="6.2.0"
+ARG DOXYGENVERSION="1.18.0"
+ARG DOXYGENRELEASE="1_18_0"
 
 
 ##################################################################################################################################
@@ -21,6 +23,8 @@ ARG CLANGVERSIONMAJOR
 ARG CLANGVERSION
 ARG LIZARDVERSION
 ARG REUSEVERSION
+ARG DOXYGENVERSION
+ARG DOXYGENRELEASE
 
 #Install prerequisites and update base OS packages
 RUN apt-get update \
@@ -60,6 +64,14 @@ RUN wget -O llvm_clang.tar.gz "https://github.com/llvm/llvm-project/releases/dow
         LLVM-${CLANGVERSION}-Linux-X64/lib/clang/${CLANGVERSIONMAJOR}/include/ \
     && rm llvm_clang.tar.gz
 
+#Install Doxygen from its Github repo
+RUN wget -O doxygen.tar.gz "https://github.com/doxygen/doxygen/releases/download/Release_${DOXYGENRELEASE}/doxygen-${DOXYGENVERSION}.linux.bin.tar.gz" \
+    && mkdir -p /opt/doxygen/bin \
+    && tar -xvf doxygen.tar.gz \
+        --strip-components=2 \
+        -C /opt/doxygen/bin \
+        doxygen-${DOXYGENVERSION}/bin/doxygen
+
 #Create a Python 3 venv
 RUN python3 -m venv /opt/pip-packages
 
@@ -89,7 +101,7 @@ RUN apt-get update \
     && apt-get install \
         -y --no-install-recommends \
         python3 \
-        doxygen \
+        graphviz \
         git \
         file \
         xz-utils \
@@ -98,4 +110,4 @@ RUN apt-get update \
 
 #Copy previously installed tools and make them globally available
 COPY --from=build /opt /opt
-ENV PATH="$PATH:/opt/cppcheck/bin/:/opt/clang/bin/:/opt/pip-packages/bin"
+ENV PATH="$PATH:/opt/cppcheck/bin/:/opt/clang/bin/:/opt/pip-packages/bin:/opt/doxygen/bin"
