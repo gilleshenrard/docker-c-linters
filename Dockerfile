@@ -93,7 +93,7 @@ RUN rm -rf /opt/pip-packages/bin/pip* /opt/pip-packages/lib/python*/site-package
 ##################################################################################################################################
 FROM debian:trixie-slim AS run
 
-#Install prerequisites and Doxygen
+#Install prerequisites and Graphviz (necessary for Doxygen)
 RUN apt-get update \
     && apt-get upgrade -y \
     && apt-get dist-upgrade -y \
