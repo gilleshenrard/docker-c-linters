@@ -1,0 +1,65 @@
+# SPDX-FileCopyrightText: 2026 Gilles Henrard <contact@gilleshenrard.com>
+#
+# SPDX-License-Identifier: MIT
+
+name: Check Docker image for vulnerabilities and functionality
+
+on: [push, pull_request]
+
+env:
+  image_name: gilleshenrard/c-linters:test-build
+
+jobs:
+  build:
+    name: Build the image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v7
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build the image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          no-cache: true
+          push: false
+          load: true
+          tags: ${{ env.image_name }}
+
+      - name: Run Docker Scout
+        uses: docker/scout-action@v1
+        with:
+          command: quickview,cves,recommendations
+          image: ${{ env.image_name }}
+          summary: true
+          only-fixed: true
+
+      - name: Test Clang tools
+        run: |
+          docker run --rm --entrypoint bash ${{ env.image_name }} -c "clang-tidy --version && clang-format --version"
+
+      - name: Test CppCheck
+        run: |
+          docker run --rm ${{ env.image_name }} cppcheck --version
+
+      - name: Test Doxygen
+        run: |
+          docker run --rm ${{ env.image_name }} doxygen --version
+
+      - name: Test Lizard
+        run: |
+          docker run --rm ${{ env.image_name }} lizard --version
+
+      - name: Test REUSE
+        run: |
+          docker run --rm ${{ env.image_name }} reuse --version
