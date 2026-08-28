@@ -153,6 +153,24 @@ docker scout cves <image_name>:<image_revision> --format markdown --output <imag
 > significantly reduces the exposure window and attack surface these base-image CVEs
 > would otherwise represent.
 
+### Tracing a Flagged Package's Origin
+
+To find out which installed package pulled in a given vulnerable dependency (e.g. a
+package named in a Scout report), run the following against the built image, not a
+fresh base image (dependency resolution can otherwise differ from what was actually
+installed):
+
+```bash
+# 1. Scout's report may name a bare library (e.g. "tiff"); find the actual installed
+#    Debian package name, since it is often versioned or prefixed differently (e.g.
+#    "libtiff6")
+docker run --rm <image_name>:<image_revision> bash -c "dpkg -l | grep -i <package>"
+
+# 2. Once you have the real package name, trace which installed package depends on it
+docker run --rm <image_name>:<image_revision> bash -c \
+  "apt-get update -qq && apt-get install -y aptitude >/dev/null 2>&1 && aptitude why <real_package_name>"
+```
+
 ---
  
 ## Image Architecture
