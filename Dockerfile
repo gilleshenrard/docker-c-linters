@@ -28,6 +28,7 @@ RUN apt-get update \
     && apt-get dist-upgrade -y \
     && apt-get autoremove -y \
     && apt-get install -y \
+        --no-install-recommends \
         wget \
         build-essential \
         cmake \
@@ -96,8 +97,8 @@ RUN apt-get update \
     && apt-get upgrade -y \
     && apt-get dist-upgrade -y \
     && apt-get autoremove -y \
-    && apt-get install \
-        -y --no-install-recommends \
+    && apt-get install -y \
+        --no-install-recommends \
         python3 \
         graphviz \
         git \
