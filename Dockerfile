@@ -3,12 +3,10 @@
 # SPDX-License-Identifier: MIT
 
 ARG CPPCHECKVERSION="2.21.0"
-ARG CLANGVERSIONMAJOR="22"
 ARG CLANGVERSION="22.1.8"
-ARG LIZARDVERSION="1.23.0"
+ARG LIZARDVERSION="1.24.0"
 ARG REUSEVERSION="6.2.0"
 ARG DOXYGENVERSION="1.18.0"
-ARG DOXYGENRELEASE="1_18_0"
 
 
 ##################################################################################################################################
@@ -19,12 +17,10 @@ SHELL ["/bin/bash", "-c"]
 
 #Redefine arguments so they're available in this step
 ARG CPPCHECKVERSION
-ARG CLANGVERSIONMAJOR
 ARG CLANGVERSION
 ARG LIZARDVERSION
 ARG REUSEVERSION
 ARG DOXYGENVERSION
-ARG DOXYGENRELEASE
 
 #Install prerequisites and update base OS packages
 RUN apt-get update \
@@ -49,28 +45,30 @@ RUN wget -O cppcheck.tar.gz "https://github.com/cppcheck-opensource/cppcheck/arc
     && cmake --install /tmp/cppcheck/build
 
 #Install Clang tools from their Github repo
-RUN wget -O llvm_clang.tar.gz "https://github.com/llvm/llvm-project/releases/download/llvmorg-${CLANGVERSION}/LLVM-${CLANGVERSION}-Linux-X64.tar.xz" \
+RUN CLANGVERSIONMAJOR=$(cut -d'.' -f1 <<< "${CLANGVERSION}") \
+    && wget -O llvm_clang.tar.gz "https://github.com/llvm/llvm-project/releases/download/llvmorg-${CLANGVERSION}/LLVM-${CLANGVERSION}-Linux-X64.tar.xz" \
     && mkdir -p /opt/clang/bin \
-    && mkdir -p /opt/clang/lib/clang/${CLANGVERSIONMAJOR}/include/ \
+    && mkdir -p "/opt/clang/lib/clang/${CLANGVERSIONMAJOR}/include/" \
     && tar -xvf llvm_clang.tar.gz \
         --strip-components=2 \
         -C /opt/clang/bin \
-        LLVM-${CLANGVERSION}-Linux-X64/bin/clang-format \
-        LLVM-${CLANGVERSION}-Linux-X64/bin/clang-tidy \
-        LLVM-${CLANGVERSION}-Linux-X64/bin/run-clang-tidy \
+        "LLVM-${CLANGVERSION}-Linux-X64/bin/clang-format" \
+        "LLVM-${CLANGVERSION}-Linux-X64/bin/clang-tidy" \
+        "LLVM-${CLANGVERSION}-Linux-X64/bin/run-clang-tidy" \
     && tar -xvf llvm_clang.tar.gz \
         --strip-components=4 \
-        -C /opt/clang/lib/clang/${CLANGVERSIONMAJOR}/ \
-        LLVM-${CLANGVERSION}-Linux-X64/lib/clang/${CLANGVERSIONMAJOR}/include/ \
+        -C "/opt/clang/lib/clang/${CLANGVERSIONMAJOR}/" \
+        "LLVM-${CLANGVERSION}-Linux-X64/lib/clang/${CLANGVERSIONMAJOR}/include/" \
     && rm llvm_clang.tar.gz
 
 #Install Doxygen from its Github repo
-RUN wget -O doxygen.tar.gz "https://github.com/doxygen/doxygen/releases/download/Release_${DOXYGENRELEASE}/doxygen-${DOXYGENVERSION}.linux.bin.tar.gz" \
+RUN DOXYGENRELEASE=$(echo "${DOXYGENVERSION}" | sed -e "s/\./_/g") \
+    && wget -O doxygen.tar.gz "https://github.com/doxygen/doxygen/releases/download/Release_${DOXYGENRELEASE}/doxygen-${DOXYGENVERSION}.linux.bin.tar.gz" \
     && mkdir -p /opt/doxygen/bin \
     && tar -xvf doxygen.tar.gz \
         --strip-components=2 \
         -C /opt/doxygen/bin \
-        doxygen-${DOXYGENVERSION}/bin/doxygen
+        "doxygen-${DOXYGENVERSION}/bin/doxygen"
 
 #Create a Python 3 venv
 RUN python3 -m venv /opt/pip-packages
@@ -81,7 +79,7 @@ RUN wget -O get-pip.py "https://bootstrap.pypa.io/get-pip.py" \
     && rm get-pip.py
 
 #Install lizard and REUSE, and upgrade dependencies to fix vulnerabilities
-RUN /opt/pip-packages/bin/pip install lizard==${LIZARDVERSION} reuse==${REUSEVERSION} \
+RUN /opt/pip-packages/bin/pip install "lizard==${LIZARDVERSION}" "reuse==${REUSEVERSION}" \
     && /opt/pip-packages/bin/pip install --upgrade "setuptools>=78.1.1" "msgpack>=1.2.1"
 
 #Cleanup pip's directories in the venv (install is leaner and fixes vulnerabilities)

@@ -6,7 +6,8 @@ A multi-stage Docker image providing a self-contained, reproducible environment 
 static analysis, formatting, complexity measurement, license compliance checking, and
 documentation generation — primarily targeting embedded C/C++ projects.
  
-**Source:** [gilleshenrard/docker-c-linters](https://github.com/gilleshenrard/docker-c-linters)
+**Github:** [gilleshenrard/docker-c-linters](https://github.com/gilleshenrard/docker-c-linters)
+**DockerHub:** [gilleshenrard/docker-c-linters/general](https://hub.docker.com/repository/docker/gilleshenrard/c-linters/general)
  
 ---
  
@@ -21,7 +22,7 @@ documentation generation — primarily targeting embedded C/C++ projects.
 | [Clang-Format](https://clang.llvm.org/docs/ClangFormat.html)                      | 22.1.8                | Code formatting                              |
 | [Clang-Tidy](https://clang.llvm.org/extra/clang-tidy/)                            | 22.1.8                | Linting and static analysis                  |
 | [run-clang-tidy](https://clang.llvm.org/extra/clang-tidy/#using-clang-tidy)       | 22.1.8                | Parallel Clang-Tidy runner                   |
-| [Lizard](https://github.com/terryyin/lizard)                                      | 1.23.0                | Cyclomatic complexity measurement            |
+| [Lizard](https://github.com/terryyin/lizard)                                      | 1.24.0                | Cyclomatic complexity measurement            |
 | [REUSE](https://reuse.software/)                                                  | 6.2.0                 | SPDX license compliance checker              |
 | [Doxygen](https://www.doxygen.nl/)                                                | 1.18.0                | Documentation generation                     |
  
@@ -113,17 +114,11 @@ at build time:
 docker build \
   --build-arg CPPCHECKVERSION="2.21.0" \
   --build-arg CLANGVERSION="22.2.0" \
-  --build-arg CLANGVERSIONMAJOR="22" \
   --build-arg LIZARDVERSION="1.23.1" \
   --build-arg REUSEVERSION="6.3.0" \
   --build-arg DOXYGENVERSION="1.18.0" \
   -t <image_name>:<image_revision> .
 ```
- 
-> **Note:** `CLANGVERSIONMAJOR` must match the major version component of
-> `CLANGVERSION` (e.g. `22` for `22.1.0`). They are kept separate because the LLVM
-> archive uses the full version string in its path, while the internal header directory
-> uses the major version only.
  
 ---
 
@@ -142,6 +137,21 @@ docker scout cache prune --sboms --force
 # Generate a CVE report in Markdown format
 docker scout cves <image_name>:<image_revision> --format markdown --output <image_name>_report.md
 ```
+
+> [!WARNING]
+> **Residual vulnerabilities are expected and are not fixable from this image.**
+> The overwhelming majority of CVEs flagged by Docker Scout come from OS-level packages
+> that are part of the `debian:trixie-slim` base image itself, not from anything
+> installed by this Dockerfile. These vulnerabilities remain until Debian's security
+> team ships a patch upstream; no build-arg override, `apt` flag, or workaround in this
+> repository can resolve them. Rebuilding the image regularly will pick up upstream
+> fixes as they become available, but a completely clean Scout report should **not** be
+> expected as a baseline for this image.
+>
+> In practice, the security impact of this is limited: this image is meant to be run
+> as a one-off tool (`docker run --rm ...`) rather than as a long-lived service, which
+> significantly reduces the exposure window and attack surface these base-image CVEs
+> would otherwise represent.
 
 ---
  
