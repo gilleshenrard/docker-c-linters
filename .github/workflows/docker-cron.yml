@@ -1,0 +1,133 @@
+# SPDX-FileCopyrightText: 2026 Gilles Henrard <contact@gilleshenrard.com>
+#
+# SPDX-License-Identifier: MIT
+
+name: Monthly base image CVE check
+
+on:
+  schedule:
+    # 1st of every month, 03:00 UTC
+    - cron: "0 3 1 * *"
+  workflow_dispatch: {}
+
+env:
+  image_name: gilleshenrard/c-linters
+  candidate_tag: gilleshenrard/c-linters:cron-candidate
+
+jobs:
+  check-and-release:
+    name: Rebuild and compare CVE profile against latest
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Pull currently published image
+        run: docker pull "${{ env.image_name }}:latest"
+
+      - name: Scan currently published image (baseline)
+        uses: docker/scout-action@v1
+        with:
+          command: cves
+          image: ${{ env.image_name }}:latest
+          sarif-file: previous.sarif.json
+          summary: false
+          write-comment: false
+
+      - name: Build fresh image, no cache
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          no-cache: true
+          push: false
+          load: true
+          tags: ${{ env.candidate_tag }}
+
+      - name: Scan freshly built image
+        uses: docker/scout-action@v1
+        with:
+          command: cves
+          image: ${{ env.candidate_tag }}
+          sarif-file: current.sarif.json
+          summary: false
+          write-comment: false
+
+      - name: Compare reports
+        id: compare
+        run: |
+          set +e
+          output=$(python3 scripts/compare_scout_reports.py previous.sarif.json current.sarif.json)
+          script_exit=$?
+          set -e
+          echo "${output}"
+
+          if [ "${script_exit}" -ne 0 ]; then
+            echo "::error::compare_scout_reports.py failed to run (exit ${script_exit}). See output above."
+            exit 1
+          fi
+
+          verdict_name=$(echo "${output}" | grep '^VERDICT=' | tail -n1 | cut -d= -f2)
+          echo "verdict=${verdict_name}" >> "$GITHUB_OUTPUT"
+
+          # The script only ever reports what happened. Everything below is
+          # this WORKFLOW's own decision about what to do about it.
+          case "${verdict_name}" in
+            NO_RELEASE_CLEAN|RELEASE_CLEAN) exit 0 ;;
+            FIXABLE_CVE_INTRODUCED|REGRESSION_ONLY) exit 1 ;;
+            RELEASE_WITH_REGRESSION) exit 0 ;; # release first, fail in a later step
+            *) echo "::error::Unrecognised verdict '${verdict_name}' from compare_scout_reports.py"; exit 1 ;;
+          esac
+
+      - name: Determine next patch version
+        if: steps.compare.outputs.verdict == 'RELEASE_CLEAN' || steps.compare.outputs.verdict == 'RELEASE_WITH_REGRESSION'
+        id: version
+        run: |
+          latest_tag=$(git tag --list 'v*.*.*' --sort=-v:refname | head -n1)
+          if [ -z "${latest_tag}" ]; then
+            echo "::error::No existing vMAJOR.MINOR.PATCH tag found. Seed one manually (e.g. v1.4.0) before the cron can compute the next patch version."
+            exit 1
+          fi
+
+          version="${latest_tag#v}"
+          major="$(cut -d. -f1 <<< "${version}")"
+          minor="$(cut -d. -f2 <<< "${version}")"
+          patch="$(cut -d. -f3 <<< "${version}")"
+          next_patch=$((patch + 1))
+          next_tag="v${major}.${minor}.${next_patch}"
+
+          echo "next_tag=${next_tag}" >> "$GITHUB_OUTPUT"
+          echo "Next release tag: ${next_tag}"
+
+      - name: Create GitHub release
+        if: steps.compare.outputs.verdict == 'RELEASE_CLEAN' || steps.compare.outputs.verdict == 'RELEASE_WITH_REGRESSION'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          release_date=$(date -u +%Y-%m-%d)
+          notes="Automated patch release: rebuilt on ${release_date} after Docker Scout detected a decrease in critical/high non-fixable CVEs in the base image. No source changes."
+          if [ "${{ steps.compare.outputs.verdict }}" = "RELEASE_WITH_REGRESSION" ]; then
+            notes="${notes} NOTE: a different critical/high non-fixable CVE also appeared in this rebuild -- see the workflow run for details."
+          fi
+          gh release create "${{ steps.version.outputs.next_tag }}" \
+            --title "${{ steps.version.outputs.next_tag }} - upstream CVE fix (${release_date})" \
+            --notes "${notes}"
+
+      - name: Fail job after release if a regression was also detected
+        if: steps.compare.outputs.verdict == 'RELEASE_WITH_REGRESSION'
+        run: |
+          echo "::error::Release ${{ steps.version.outputs.next_tag }} was published, but a critical/high non-fixable CVE also newly appeared in this rebuild. Failing the job so this gets investigated."
+          exit 1

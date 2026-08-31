@@ -7,9 +7,9 @@ static analysis, formatting, complexity measurement, license compliance checking
 documentation generation — primarily targeting embedded C/C++ projects.
  
 **Github:** [gilleshenrard/docker-c-linters](https://github.com/gilleshenrard/docker-c-linters)
+
 **DockerHub:** [gilleshenrard/docker-c-linters/general](https://hub.docker.com/repository/docker/gilleshenrard/c-linters/general)
  
----
  
 ## Included Tools
  
@@ -25,9 +25,8 @@ documentation generation — primarily targeting embedded C/C++ projects.
 | [Lizard](https://github.com/terryyin/lizard)                                      | 1.24.0                | Cyclomatic complexity measurement            |
 | [REUSE](https://reuse.software/)                                                  | 6.2.0                 | SPDX license compliance checker              |
 | [Doxygen](https://www.doxygen.nl/)                                                | 1.18.0                | Documentation generation                     |
- 
----
- 
+
+
 ## Pulling the Image
  
 The image is hosted on Docker Hub and can be pulled with:
@@ -35,8 +34,7 @@ The image is hosted on Docker Hub and can be pulled with:
 ```bash
 docker pull gilleshenrard/c-linters:latest
 ```
- 
----
+
  
 ## Usage
  
@@ -61,9 +59,8 @@ docker run --rm -v "$(pwd)":/src <image_name>:<image_revision> reuse lint
 ```bash
 docker run --rm -it -v "$(pwd)":/src <image_name>:<image_revision> bash
 ```
- 
----
- 
+
+
 ## GitHub Actions Integration
  
 ```yaml
@@ -96,9 +93,8 @@ jobs:
       - name: Documentation (Doxygen)
         run: doxygen Doxyfile
 ```
- 
----
- 
+
+
 ## Building the Image
  
 ```bash
@@ -119,8 +115,7 @@ docker build \
   --build-arg DOXYGENVERSION="1.18.0" \
   -t <image_name>:<image_revision> .
 ```
- 
----
+
 
 ## Vulnerability Scanning
 
@@ -171,7 +166,6 @@ docker run --rm <image_name>:<image_revision> bash -c \
   "apt-get update -qq && apt-get install -y aptitude >/dev/null 2>&1 && aptitude why <real_package_name>"
 ```
 
----
  
 ## Image Architecture
  
@@ -198,7 +192,6 @@ The image uses a **two-stage build** to keep the final image lean:
  
 No build toolchain (cmake, ninja, wget, gcc…) is present in the final image.
  
----
  
 ## Tool Locations at Runtime
  
@@ -211,8 +204,23 @@ No build toolchain (cmake, ninja, wget, gcc…) is present in the final image.
 | `/opt/doxygen/bin/`         | `doxygen`                                      |
  
 All of the above are appended to `PATH`, so every tool is callable directly by name.
- 
----
+
+
+## Versioning
+
+Image tags and GitHub releases follow [Semantic Versioning](https://semver.org/)
+(`vMAJOR.MINOR.PATCH`):
+
+- **MAJOR** — a tool was added or removed, or the image's architecture changed
+  in a way that can break existing usage.
+- **MINOR** — a pinned tool version was bumped (e.g. a newer Clang-Tidy). The
+  tool is still invoked the same way, but its behavior may have evolved (for
+  example, new warnings may fire that didn't before).
+- **PATCH** — a bug fix, or an automated rebuild that picked up an upstream
+  security fix in the base image. Patch releases may occur with **no visible
+  change** to this repository's source, since they can be triggered solely by
+  Debian shipping a fix for a previously unfixable CVE.
+
  
 ## License
  
