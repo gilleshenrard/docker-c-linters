@@ -2,9 +2,11 @@
  
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
  
-A multi-stage Docker image providing a self-contained, reproducible environment for
-static analysis, formatting, complexity measurement, license compliance checking, and
-documentation generation — primarily targeting embedded C/C++ projects.
+A ready-to-use Docker image bundling several widely-used linters and documentation tools for C/C++ projects.
+Use it to run static analysis, format checks,
+complexity measurement, license compliance checks, and documentation generation —
+either as one-off local commands or as steps in a CI pipeline — without installing
+or version-managing each tool yourself.
  
 **Github:** [gilleshenrard/docker-c-linters](https://github.com/gilleshenrard/docker-c-linters)
 
@@ -42,22 +44,23 @@ docker pull gilleshenrard/c-linters:latest
  
 ```bash
 # Static analysis
-docker run --rm -v "$(pwd)":/src <image_name>:<image_revision> cppcheck --enable=all /src
+docker run --rm -v "$(pwd)":/src c-linters:latest cppcheck --enable=all /src
+docker run --rm -v "$(pwd)":/src c-linters:latest run-clang-tidy -p build/
  
 # Format check
-docker run --rm -v "$(pwd)":/src <image_name>:<image_revision> clang-format --dry-run --Werror /src/main.c
+docker run --rm -v "$(pwd)":/src c-linters:latest clang-format --dry-run --Werror /src/main.c
  
 # Complexity report
-docker run --rm -v "$(pwd)":/src <image_name>:<image_revision> lizard /src
+docker run --rm -v "$(pwd)":/src c-linters:latest lizard /src
  
 # License compliance
-docker run --rm -v "$(pwd)":/src <image_name>:<image_revision> reuse lint
+docker run --rm -v "$(pwd)":/src c-linters:latest reuse lint
 ```
  
 ### Interactive shell
  
 ```bash
-docker run --rm -it -v "$(pwd)":/src <image_name>:<image_revision> bash
+docker run --rm -it -v "$(pwd)":/src c-linters:latest bash
 ```
 
 
@@ -71,7 +74,7 @@ jobs:
       image: gilleshenrard/c-linters:latest
  
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
  
       - name: Static analysis (CppCheck)
         run: cppcheck --enable=all --error-exitcode=1 src/
@@ -98,7 +101,7 @@ jobs:
 ## Building the Image
  
 ```bash
-docker build -t <image_name>:<image_revision> .
+docker build -t c-linters:latest .
 ```
  
 ### Overriding Tool Versions
@@ -113,7 +116,7 @@ docker build \
   --build-arg LIZARDVERSION="1.23.1" \
   --build-arg REUSEVERSION="6.3.0" \
   --build-arg DOXYGENVERSION="1.18.0" \
-  -t <image_name>:<image_revision> .
+  -t c-linters:latest .
 ```
 
 
@@ -130,7 +133,7 @@ Vulnerabilities can be checked using [Docker Scout](https://docs.docker.com/scou
 docker scout cache prune --sboms --force
 
 # Generate a CVE report in Markdown format
-docker scout cves <image_name>:<image_revision> --format markdown --output <image_name>_report.md
+docker scout cves c-linters:latest --format markdown --output <image_name>_report.md
 ```
 
 > [!WARNING]
@@ -159,10 +162,10 @@ installed):
 # 1. Scout's report may name a bare library (e.g. "tiff"); find the actual installed
 #    Debian package name, since it is often versioned or prefixed differently (e.g.
 #    "libtiff6")
-docker run --rm <image_name>:<image_revision> bash -c "dpkg -l | grep -i <package>"
+docker run --rm c-linters:latest bash -c "dpkg -l | grep -i <package>"
 
 # 2. Once you have the real package name, trace which installed package depends on it
-docker run --rm <image_name>:<image_revision> bash -c \
+docker run --rm c-linters:latest bash -c \
   "apt-get update -qq && apt-get install -y aptitude >/dev/null 2>&1 && aptitude why <real_package_name>"
 ```
 
@@ -173,19 +176,19 @@ The image uses a **two-stage build** to keep the final image lean:
  
 ```
 +-----------------------------------------------+
-| Stage 1 : build (debian:trixie-slim)          |
+| Stage 1 : build (based on debian:trixie-slim) |
 |                                               |
-|  - Compile CppCheck from source               |
+|  - Build CppCheck from source                 |
 |  - Extract Clang binaries from LLVM release   |
 |  - Install Doxygen from its Github repo       |
 |  - Install Lizard + REUSE in Python venv      |
 +------------------------|----------------------+
                          | COPY /opt
 +------------------------|----------------------+
-| Stage 2 : run (debian:trixie-slim)            |
+| Stage 2 : run (based on debian:trixie-slim)   |
 |                                               |
-|  - Install python3, git, file, graphviz,      |
-|    ca-certificates                            |
+|  - Minimal packages needed to run the tools   |
+|  - Additional tools: git, graphviz            |
 |  - Append tool paths to PATH                  |
 +-----------------------------------------------+
 ```
