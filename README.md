@@ -20,7 +20,7 @@ or version-managing each tool yourself.
  
 | Tool                                                                              | Version               | Purpose                                      |
 |-----------------------------------------------------------------------------------|-----------------------|----------------------------------------------|
-| [CppCheck](https://cppcheck.sourceforge.io/)                                      | 2.21.0                | Static analysis                              |
+| [CppCheck](https://cppcheck.sourceforge.io/)                                      | 2.22.0                | Static analysis                              |
 | [Clang-Format](https://clang.llvm.org/docs/ClangFormat.html)                      | 22.1.8                | Code formatting                              |
 | [Clang-Tidy](https://clang.llvm.org/extra/clang-tidy/)                            | 22.1.8                | Linting and static analysis                  |
 | [run-clang-tidy](https://clang.llvm.org/extra/clang-tidy/#using-clang-tidy)       | 22.1.8                | Parallel Clang-Tidy runner                   |
