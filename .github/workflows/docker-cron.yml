@@ -4,19 +4,54 @@
 
 name: Monthly base image CVE check
 
+# Decision table (all CVE classification is done on TODAY's Scout database):
+#
+#   | Situation                                              | Outcome            |
+#   |--------------------------------------------------------|--------------------|
+#   | Fresh rebuild still contains a fixable CVE             | Fail (needs a fix) |
+#   | Published image has fixable CVEs, rebuild has none     | Patch release      |
+#   | Neither                                                | Nothing to do      |
+#   | Non-fixable CVE present in rebuild but not in :latest  | Warning only       |
+#
+# Push and pull request runs are DRY RUNS: they lint the scripts and run the
+# whole classification on real Scout data, but never publish anything. Only
+# scheduled and manual runs may push images or create releases.
+#
+# Why scanning :latest works: when Debian ships a fix, Scout reclassifies that
+# CVE in the already-published image from "not fixed" to fixable. So ":latest
+# has fixable CVEs" is exactly the signal that the published image is stale.
+
 on:
+  push:
+    paths:
+      - '.github/workflows/docker-cron.yml'
+      - 'scripts/**'
+  pull_request:
+    paths:
+      - '.github/workflows/docker-cron.yml'
+      - 'scripts/**'
   schedule:
     # 1st of every month, 03:00 UTC
     - cron: "0 3 1 * *"
   workflow_dispatch: {}
 
+# Publishing runs share the "release" group with docker-publish.yml: a cron run
+# and a manual release must never compute the next tag or push :latest at the
+# same time. Dry runs get their own per-ref group, because GitHub keeps only one
+# PENDING run per group and a newer one cancels it: a dry run must never be able
+# to cancel a queued release.
+concurrency:
+  group: ${{ (github.event_name == 'push' || github.event_name == 'pull_request') && format('cron-dry-run-{0}', github.ref) || 'release' }}
+  cancel-in-progress: false
+
 env:
+  publishing_allowed: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
   image_name: gilleshenrard/c-linters
   candidate_tag: gilleshenrard/c-linters:cron-candidate
 
 jobs:
   check-and-release:
-    name: Rebuild and compare CVE profile against latest
+    name: Rebuild, classify CVEs, release if the published image is stale
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -27,6 +62,10 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Before the multi-minute build, so a script error fails fast.
+      - name: Lint scripts (ShellCheck)
+        run: shellcheck scripts/*.sh
+
       - name: Log in to Docker Hub
         uses: docker/login-action@v4
         with:
@@ -35,18 +74,6 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
-
-      - name: Pull currently published image
-        run: docker pull "${{ env.image_name }}:latest"
-
-      - name: Scan currently published image (baseline)
-        uses: docker/scout-action@v1
-        with:
-          command: cves
-          image: ${{ env.image_name }}:latest
-          sarif-file: previous.sarif.json
-          summary: false
-          write-comment: false
 
       - name: Build fresh image, no cache
         uses: docker/build-push-action@v7
@@ -57,77 +84,108 @@ jobs:
           load: true
           tags: ${{ env.candidate_tag }}
 
+      # Both scans are unfiltered on purpose: fixability and severity are
+      # classified below with jq, from the SARIF schema, in one place.
+      - name: Scan published image
+        uses: docker/scout-action@v1
+        with:
+          command: cves
+          image: registry://${{ env.image_name }}:latest
+          sarif-file: latest.sarif.json
+          summary: false
+          write-comment: false
+
       - name: Scan freshly built image
         uses: docker/scout-action@v1
         with:
           command: cves
-          image: ${{ env.candidate_tag }}
-          sarif-file: current.sarif.json
+          image: local://${{ env.candidate_tag }}
+          sarif-file: candidate.sarif.json
           summary: false
           write-comment: false
 
-      - name: Compare reports
-        id: compare
+      # The script only classifies; every decision below is this workflow's.
+      - name: Classify CVEs
+        id: classify
         run: |
-          set +e
-          output=$(python3 scripts/compare_scout_reports.py previous.sarif.json current.sarif.json)
-          script_exit=$?
-          set -e
-          echo "${output}"
+          bash scripts/classify_scout_cves.sh latest.sarif.json candidate.sarif.json | tee -a "$GITHUB_OUTPUT"
 
-          if [ "${script_exit}" -ne 0 ]; then
-            echo "::error::compare_scout_reports.py failed to run (exit ${script_exit}). See output above."
-            exit 1
-          fi
+      # Nothing in this repository can resolve these: report, never block.
+      - name: Warn about new non-fixable CVEs
+        if: steps.classify.outputs.new_unfixable != ''
+        env:
+          NEW_UNFIXABLE: ${{ steps.classify.outputs.new_unfixable }}
+        run: |
+          echo "::warning::New non-fixable CVE(s) since the published image: ${NEW_UNFIXABLE}"
 
-          verdict_name=$(echo "${output}" | grep '^VERDICT=' | tail -n1 | cut -d= -f2)
-          echo "verdict=${verdict_name}" >> "$GITHUB_OUTPUT"
+      # A fresh, no-cache rebuild should pick up every available fix. If a fixable
+      # CVE survives it, the fix needs a source change (e.g. bumping a pinned tool
+      # version). Failing the job triggers a notification.
+      - name: Fail if fixable CVEs survive the rebuild
+        if: steps.classify.outputs.verdict == 'FAIL_FIXABLE_REMAINS'
+        env:
+          REMAINING_FIXABLE: ${{ steps.classify.outputs.remaining_fixable }}
+        run: |
+          echo "::error::Fixable CVE(s) remain after a fresh rebuild: ${REMAINING_FIXABLE}. A source change is needed; not releasing."
+          exit 1
 
-          # The script only ever reports what happened. Everything below is
-          # this WORKFLOW's own decision about what to do about it.
-          case "${verdict_name}" in
-            NO_RELEASE_CLEAN|RELEASE_CLEAN) exit 0 ;;
-            FIXABLE_CVE_INTRODUCED|REGRESSION_ONLY) exit 1 ;;
-            RELEASE_WITH_REGRESSION) exit 0 ;; # release first, fail in a later step
-            *) echo "::error::Unrecognised verdict '${verdict_name}' from compare_scout_reports.py"; exit 1 ;;
-          esac
+      - name: Report dry-run outcome
+        if: steps.classify.outputs.verdict == 'RELEASE' && env.publishing_allowed != 'true'
+        env:
+          FIXED_CVES: ${{ steps.classify.outputs.fixed_cves }}
+        run: |
+          echo "::notice::Dry run (${GITHUB_EVENT_NAME}): a scheduled run would release now, resolving: ${FIXED_CVES}"
 
       - name: Determine next patch version
-        if: steps.compare.outputs.verdict == 'RELEASE_CLEAN' || steps.compare.outputs.verdict == 'RELEASE_WITH_REGRESSION'
+        if: steps.classify.outputs.verdict == 'RELEASE' && env.publishing_allowed == 'true'
         id: version
         run: |
           latest_tag=$(git tag --list 'v*.*.*' --sort=-v:refname | head -n1)
           if [ -z "${latest_tag}" ]; then
-            echo "::error::No existing vMAJOR.MINOR.PATCH tag found. Seed one manually (e.g. v1.4.0) before the cron can compute the next patch version."
-            exit 1
+              echo "::error::No existing vMAJOR.MINOR.PATCH tag found. Seed one manually (e.g. v1.4.0) before the cron can compute the next patch version."
+              exit 1
           fi
 
           version="${latest_tag#v}"
           major="$(cut -d. -f1 <<< "${version}")"
           minor="$(cut -d. -f2 <<< "${version}")"
           patch="$(cut -d. -f3 <<< "${version}")"
-          next_patch=$((patch + 1))
-          next_tag="v${major}.${minor}.${next_patch}"
+          next_tag="v${major}.${minor}.$((patch + 1))"
 
           echo "next_tag=${next_tag}" >> "$GITHUB_OUTPUT"
           echo "Next release tag: ${next_tag}"
 
+      # A release created with GITHUB_TOKEN does NOT trigger docker-publish.yml
+      # (GitHub blocks workflow chaining through GITHUB_TOKEN). This job therefore
+      # pushes the exact image it just scanned, BEFORE creating the release, so a
+      # failed release never points to an image that does not exist.
+      - name: Push the scanned image
+        if: steps.classify.outputs.verdict == 'RELEASE' && env.publishing_allowed == 'true'
+        env:
+          NEXT_TAG: ${{ steps.version.outputs.next_tag }}
+        run: |
+          docker tag "${candidate_tag}" "${image_name}:${NEXT_TAG}"
+          docker tag "${candidate_tag}" "${image_name}:latest"
+          docker push "${image_name}:${NEXT_TAG}"
+          docker push "${image_name}:latest"
+
+      - name: Update Docker Hub description
+        if: steps.classify.outputs.verdict == 'RELEASE' && env.publishing_allowed == 'true'
+        uses: peter-evans/dockerhub-description@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: ${{ env.image_name }}
+          readme-filepath: ./README.md
+
       - name: Create GitHub release
-        if: steps.compare.outputs.verdict == 'RELEASE_CLEAN' || steps.compare.outputs.verdict == 'RELEASE_WITH_REGRESSION'
+        if: steps.classify.outputs.verdict == 'RELEASE' && env.publishing_allowed == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEXT_TAG: ${{ steps.version.outputs.next_tag }}
+          FIXED_CVES: ${{ steps.classify.outputs.fixed_cves }}
         run: |
           release_date=$(date -u +%Y-%m-%d)
-          notes="Automated patch release: rebuilt on ${release_date} after Docker Scout detected a decrease in critical/high non-fixable CVEs in the base image. No source changes."
-          if [ "${{ steps.compare.outputs.verdict }}" = "RELEASE_WITH_REGRESSION" ]; then
-            notes="${notes} NOTE: a different critical/high non-fixable CVE also appeared in this rebuild -- see the workflow run for details."
-          fi
-          gh release create "${{ steps.version.outputs.next_tag }}" \
-            --title "${{ steps.version.outputs.next_tag }} - upstream CVE fix (${release_date})" \
-            --notes "${notes}"
-
-      - name: Fail job after release if a regression was also detected
-        if: steps.compare.outputs.verdict == 'RELEASE_WITH_REGRESSION'
-        run: |
-          echo "::error::Release ${{ steps.version.outputs.next_tag }} was published, but a critical/high non-fixable CVE also newly appeared in this rebuild. Failing the job so this gets investigated."
-          exit 1
+          gh release create "${NEXT_TAG}" \
+              --title "${NEXT_TAG} - upstream CVE fix (${release_date})" \
+              --notes "Automated patch release, rebuilt on ${release_date}. No source changes. Resolves: ${FIXED_CVES}"

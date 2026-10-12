@@ -4,16 +4,40 @@
 
 name: Publish Docker image
 
+# Fires on releases created by a human (or a PAT). Releases created by the
+# monthly cron use GITHUB_TOKEN, which does not trigger this workflow; the cron
+# pushes its own scanned image instead.
+#
+# Release policy: linear releases from main only, tagged vMAJOR.MINOR.PATCH.
+# No pre-releases, no hotfixes on older lines, so every release becomes :latest.
 on:
   release:
     types: [published]
 
+# Shared with docker-cron.yml: never push :latest from two runs at once.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  image_name: gilleshenrard/c-linters
+  release_tag: ${{ github.event.release.tag_name }}
+
 jobs:
   push_to_registry:
-    name: Build and push to Docker Hub
+    name: Build, gate and push to Docker Hub
     runs-on: ubuntu-latest
 
     steps:
+      # The cron computes its next patch version from 'v*.*.*' tags: a release
+      # tagged any other way would be invisible to it and break versioning.
+      - name: Validate release tag format
+        run: |
+          if [[ ! "${release_tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "::error::Release tag '${release_tag}' is not vMAJOR.MINOR.PATCH. Delete this release and its tag, then re-create it with a valid tag."
+              exit 1
+          fi
+
       - name: Checkout source
         uses: actions/checkout@v7
 
@@ -23,19 +47,59 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push image
+      # Idempotency guard: if this tag is already on Docker Hub (e.g. pushed by
+      # the cron, or a re-run of this job), do not rebuild and overwrite it.
+      - name: Skip if this tag is already published
+        id: existing
+        run: |
+          if docker buildx imagetools inspect "${image_name}:${release_tag}" > /dev/null 2>&1; then
+              echo "::notice::${image_name}:${release_tag} already exists on Docker Hub, nothing to do."
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+              echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Docker Buildx
+        if: steps.existing.outputs.skip == 'false'
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build fresh image, no cache
+        if: steps.existing.outputs.skip == 'false'
         uses: docker/build-push-action@v7
         with:
           context: .
-          push: true
-          tags: |
-            gilleshenrard/c-linters:${{ github.event.release.tag_name }}
-            gilleshenrard/c-linters:latest
+          no-cache: true
+          push: false
+          load: true
+          tags: ${{ env.image_name }}:${{ env.release_tag }}
+
+      # Same gate as docker-lint.yml and docker-cron.yml: never publish an image
+      # containing ANY fixable CVE, of any severity. Non-fixable CVEs are ignored
+      # on purpose: nothing in this repository can resolve them.
+      - name: Fail on any fixable CVE
+        if: steps.existing.outputs.skip == 'false'
+        uses: docker/scout-action@v1
+        with:
+          command: cves
+          image: local://${{ env.image_name }}:${{ env.release_tag }}
+          only-fixed: true
+          exit-code: true
+          summary: true
+          write-comment: false
+
+      # Push the exact image that was scanned above: retag, never rebuild.
+      - name: Push the scanned image
+        if: steps.existing.outputs.skip == 'false'
+        run: |
+          docker tag "${image_name}:${release_tag}" "${image_name}:latest"
+          docker push "${image_name}:${release_tag}"
+          docker push "${image_name}:latest"
 
       - name: Update Docker Hub description
+        if: steps.existing.outputs.skip == 'false'
         uses: peter-evans/dockerhub-description@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-          repository: gilleshenrard/c-linters
+          repository: ${{ env.image_name }}
           readme-filepath: ./README.md

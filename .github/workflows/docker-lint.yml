@@ -9,12 +9,10 @@ on:
     paths:
       - 'Dockerfile'
       - '.github/workflows/docker-lint.yml'
-      - 'scripts/compare_scout_reports.py'
   pull_request:
     paths:
       - 'Dockerfile'
       - '.github/workflows/docker-lint.yml'
-      - 'scripts/compare_scout_reports.py'
 
 env:
   image_name: gilleshenrard/c-linters:test-build
