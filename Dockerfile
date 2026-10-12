@@ -42,7 +42,7 @@ RUN wget -O cppcheck.tar.gz "https://github.com/cppcheck-opensource/cppcheck/arc
     && tar --strip-components=1 -xvf cppcheck.tar.gz -C /tmp/cppcheck \
     && rm cppcheck.tar.gz \
     && cmake -S /tmp/cppcheck -B /tmp/cppcheck/build -DCMAKE_INSTALL_PREFIX=/opt/cppcheck \
-    && cmake --build /tmp/cppcheck/build --parallel $(nproc) \
+    && cmake --build /tmp/cppcheck/build --parallel "$(nproc)" \
     && cmake --install /tmp/cppcheck/build
 
 #Install Clang tools from their Github repo
@@ -79,7 +79,7 @@ RUN wget -O get-pip.py "https://bootstrap.pypa.io/get-pip.py" \
     && /opt/pip-packages/bin/python3 get-pip.py \
     && rm get-pip.py
 
-#Install lizard and REUSE, and upgrade dependencies to fix vulnerabilities
+#Install lizard and REUSE
 RUN /opt/pip-packages/bin/pip install "lizard==${LIZARDVERSION}" "reuse==${REUSEVERSION}"
 
 #Cleanup pip's directories in the venv (install is leaner and fixes vulnerabilities)
@@ -109,3 +109,6 @@ RUN apt-get update \
 #Copy previously installed tools and make them globally available
 COPY --from=build /opt /opt
 ENV PATH="$PATH:/opt/cppcheck/bin/:/opt/clang/bin/:/opt/pip-packages/bin:/opt/doxygen/bin"
+
+#Default to the conventional mount point, so tools run on the mounted project
+WORKDIR /src

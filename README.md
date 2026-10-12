@@ -8,9 +8,9 @@ complexity measurement, license compliance checks, and documentation generation 
 either as one-off local commands or as steps in a CI pipeline — without installing
 or version-managing each tool yourself.
  
-**Github:** [gilleshenrard/docker-c-linters](https://github.com/gilleshenrard/docker-c-linters)
+**GitHub:** [gilleshenrard/docker-c-linters](https://github.com/gilleshenrard/docker-c-linters)
 
-**DockerHub:** [gilleshenrard/docker-c-linters/general](https://hub.docker.com/repository/docker/gilleshenrard/c-linters/general)
+**Docker Hub:** [gilleshenrard/c-linters](https://hub.docker.com/r/gilleshenrard/c-linters)
  
  
 ## Included Tools
@@ -40,27 +40,42 @@ docker pull gilleshenrard/c-linters:latest
  
 ## Usage
  
+The image's working directory is `/src`. Mount your project there and every tool
+runs on it directly.
+ 
 ### Run a one-off tool
  
 ```bash
 # Static analysis
-docker run --rm -v "$(pwd)":/src c-linters:latest cppcheck --enable=all /src
-docker run --rm -v "$(pwd)":/src c-linters:latest run-clang-tidy -p build/
+docker run --rm -v "$(pwd)":/src gilleshenrard/c-linters:latest cppcheck --enable=all .
  
 # Format check
-docker run --rm -v "$(pwd)":/src c-linters:latest clang-format --dry-run --Werror /src/main.c
+docker run --rm -v "$(pwd)":/src gilleshenrard/c-linters:latest clang-format --dry-run --Werror main.c
  
 # Complexity report
-docker run --rm -v "$(pwd)":/src c-linters:latest lizard /src
+docker run --rm -v "$(pwd)":/src gilleshenrard/c-linters:latest lizard .
  
 # License compliance
-docker run --rm -v "$(pwd)":/src c-linters:latest reuse lint
+docker run --rm -v "$(pwd)":/src gilleshenrard/c-linters:latest reuse lint
+ 
+# Documentation
+docker run --rm -v "$(pwd)":/src gilleshenrard/c-linters:latest doxygen Doxyfile
+```
+ 
+### Clang-Tidy with a compilation database
+ 
+CMake writes **absolute host paths** into `compile_commands.json`. Mounted at `/src`,
+those paths do not exist inside the container and Clang-Tidy cannot find any source
+file. Mount the project at the same path as on the host instead:
+ 
+```bash
+docker run --rm -v "$(pwd)":"$(pwd)" -w "$(pwd)" gilleshenrard/c-linters:latest run-clang-tidy -p build/
 ```
  
 ### Interactive shell
  
 ```bash
-docker run --rm -it -v "$(pwd)":/src c-linters:latest bash
+docker run --rm -it -v "$(pwd)":/src gilleshenrard/c-linters:latest bash
 ```
 
 
@@ -190,6 +205,7 @@ The image uses a **two-stage build** to keep the final image lean:
 |  - Minimal packages needed to run the tools   |
 |  - Additional tools: git, graphviz            |
 |  - Append tool paths to PATH                  |
+|  - Set working directory to /src              |
 +-----------------------------------------------+
 ```
  
@@ -207,6 +223,7 @@ No build toolchain (cmake, ninja, wget, gcc…) is present in the final image.
 | `/opt/doxygen/bin/`         | `doxygen`                                      |
  
 All of the above are appended to `PATH`, so every tool is callable directly by name.
+The working directory is `/src`.
 
 
 ## Versioning
