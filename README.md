@@ -21,10 +21,10 @@ or version-managing each tool yourself.
 | Tool                                                                              | Version               | Purpose                                      |
 |-----------------------------------------------------------------------------------|-----------------------|----------------------------------------------|
 | [CppCheck](https://cppcheck.sourceforge.io/)                                      | 2.22.0                | Static analysis                              |
-| [Clang-Format](https://clang.llvm.org/docs/ClangFormat.html)                      | 22.1.8                | Code formatting                              |
-| [Clang-Tidy](https://clang.llvm.org/extra/clang-tidy/)                            | 22.1.8                | Linting and static analysis                  |
-| [run-clang-tidy](https://clang.llvm.org/extra/clang-tidy/#using-clang-tidy)       | 22.1.8                | Parallel Clang-Tidy runner                   |
-| [Lizard](https://github.com/terryyin/lizard)                                      | 1.24.0                | Cyclomatic complexity measurement            |
+| [Clang-Format](https://clang.llvm.org/docs/ClangFormat.html)                      | 23.1.3                | Code formatting                              |
+| [Clang-Tidy](https://clang.llvm.org/extra/clang-tidy/)                            | 23.1.3                | Linting and static analysis                  |
+| [run-clang-tidy](https://clang.llvm.org/extra/clang-tidy/#using-clang-tidy)       | 23.1.3                | Parallel Clang-Tidy runner                   |
+| [Lizard](https://github.com/terryyin/lizard)                                      | 1.24.1                | Cyclomatic complexity measurement            |
 | [REUSE](https://reuse.software/)                                                  | 6.2.0                 | SPDX license compliance checker              |
 | [Doxygen](https://www.doxygen.nl/)                                                | 1.18.0                | Documentation generation                     |
 
