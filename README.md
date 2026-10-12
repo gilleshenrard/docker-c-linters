@@ -202,7 +202,7 @@ No build toolchain (cmake, ninja, wget, gcc…) is present in the final image.
 |-----------------------------|------------------------------------------------|
 | `/opt/cppcheck/bin/`        | `cppcheck` binary                              |
 | `/opt/clang/bin/`           | `clang-format`, `clang-tidy`, `run-clang-tidy` |
-| `/opt/clang/lib/clang/22/`  | Clang built-in headers                         |
+| `/opt/clang/lib/clang/23/`  | Clang built-in headers                         |
 | `/opt/pip-packages/bin/`    | `lizard`, `reuse`                              |
 | `/opt/doxygen/bin/`         | `doxygen`                                      |
  

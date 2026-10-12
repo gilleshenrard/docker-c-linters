@@ -80,8 +80,7 @@ RUN wget -O get-pip.py "https://bootstrap.pypa.io/get-pip.py" \
     && rm get-pip.py
 
 #Install lizard and REUSE, and upgrade dependencies to fix vulnerabilities
-RUN /opt/pip-packages/bin/pip install "lizard==${LIZARDVERSION}" "reuse==${REUSEVERSION}" \
-    && /opt/pip-packages/bin/pip install --upgrade "setuptools>=78.1.1" "msgpack>=1.2.1"
+RUN /opt/pip-packages/bin/pip install "lizard==${LIZARDVERSION}" "reuse==${REUSEVERSION}"
 
 #Cleanup pip's directories in the venv (install is leaner and fixes vulnerabilities)
 RUN rm -rf /opt/pip-packages/bin/pip* /opt/pip-packages/lib/python*/site-packages/pip
