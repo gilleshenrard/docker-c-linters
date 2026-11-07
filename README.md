@@ -21,11 +21,11 @@ or version-managing each tool yourself.
 | Tool                                                                              | Version               | Purpose                                      |
 |-----------------------------------------------------------------------------------|-----------------------|----------------------------------------------|
 | [CppCheck](https://cppcheck.sourceforge.io/)                                      | 2.22.0                | Static analysis                              |
-| [Clang-Format](https://clang.llvm.org/docs/ClangFormat.html)                      | 23.1.4                | Code formatting                              |
-| [Clang-Tidy](https://clang.llvm.org/extra/clang-tidy/)                            | 23.1.4                | Linting and static analysis                  |
-| [run-clang-tidy](https://clang.llvm.org/extra/clang-tidy/#using-clang-tidy)       | 23.1.4                | Parallel Clang-Tidy runner                   |
-| [Lizard](https://github.com/terryyin/lizard)                                      | 1.24.3                | Cyclomatic complexity measurement            |
-| [REUSE](https://reuse.software/)                                                  | 6.2.0                 | SPDX license compliance checker              |
+| [Clang-Format](https://clang.llvm.org/docs/ClangFormat.html)                      | 23.1.5                | Code formatting                              |
+| [Clang-Tidy](https://clang.llvm.org/extra/clang-tidy/)                            | 23.1.5                | Linting and static analysis                  |
+| [run-clang-tidy](https://clang.llvm.org/extra/clang-tidy/#using-clang-tidy)       | 23.1.5                | Parallel Clang-Tidy runner                   |
+| [Lizard](https://github.com/terryyin/lizard)                                      | 1.25.0                | Cyclomatic complexity measurement            |
+| [REUSE](https://reuse.software/)                                                  | 6.3.0                 | SPDX license compliance checker              |
 | [Doxygen](https://www.doxygen.nl/)                                                | 1.18.0                | Documentation generation                     |
 
 
